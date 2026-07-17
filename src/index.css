@@ -1,0 +1,24 @@
+@import "tailwindcss";
+
+@theme {
+  --color-space: #0a0a12;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: var(--color-space);
+  overflow: hidden;
+}
+
+canvas {
+  display: block;
+  user-select: none;
+}
