@@ -8,17 +8,41 @@ html,
 body,
 #root {
   width: 100%;
-  height: 100%;
+  min-height: 100%; /* 화면 고정(100%)을 풀고 내용만큼 길어질 수 있도록 허용 */
   margin: 0;
   padding: 0;
 }
 
 body {
   background-color: var(--color-space);
-  overflow: hidden;
+  overflow-x: hidden; /* overflow: hidden을 제거하고 가로 삐져나옴만 방지 */
 }
 
 canvas {
   display: block;
   user-select: none;
+}
+
+/* src/index.css 맨 아래에 추가 */
+@keyframes scroll {
+  to {
+    transform: translate(calc(-50% - 0.5rem));
+  }
+}
+
+@keyframes wormhole {
+  0% {
+    background-position: 0px 0px;
+  }
+  100% {
+    background-position: 15rem 0px;
+  }
+}
+
+.animate-scroll {
+  animation: scroll var(--animation-duration, 40s) var(--animation-direction, forwards) linear infinite;
+}
+
+.animate-wormhole {
+  animation: wormhole 15s linear infinite;
 }

@@ -32,38 +32,12 @@ export const products = [
   { title: "Image 14", link: "#", thumbnail: "https://images.unsplash.com/photo-1614729939124-032f0b56c9ce?q=80&w=800&auto=format&fit=crop" },
 ];
 
-export default function LandingPage() {
+export default function LandingPage({ onLogin }: { onLogin?: () => void }) {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
 
   return (
-    <div className="bg-[#050505] min-h-screen w-full relative">
+   <div className="bg-[#050505] h-screen w-full relative overflow-y-auto overflow-x-hidden">
       
-      {/* 글로벌 애니메이션용 CSS 주입 */}
-      <style>{`
-        .animate-scroll {
-          animation: scroll var(--animation-duration, 40s) var(--animation-direction, forwards) linear infinite;
-        }
-        @keyframes scroll {
-          to {
-            transform: translate(calc(-50% - 0.5rem));
-          }
-        }
-        /* 웜홀 내부 십자선 그리드 애니메이션 추가 */
-        .animate-wormhole {
-          /* 카드(normal=40s)보다 느리고 묵직하게 움직이도록 15s 부여 */
-          animation: wormhole 15s linear infinite; 
-        }
-        @keyframes wormhole {
-          0% {
-            background-position: 0px 0px;
-          }
-          100% {
-            /* 3rem과 5rem의 공배수인 15rem으로 설정하여 모바일/PC 화면 모두에서 끊김없이 무한 루프 */
-            background-position: 15rem 0px; 
-          }
-        }
-      `}</style>
-
       {/* 1. 상단 고정 헤더 (로그인만 남김) */}
       <header className="fixed top-0 left-0 w-full z-50 flex items-center justify-between px-8 py-6 bg-gradient-to-b from-black/80 to-transparent backdrop-blur-sm text-white">
         <div className="flex items-center gap-2 cursor-pointer">
@@ -107,7 +81,7 @@ export default function LandingPage() {
             
             <h2 className="text-2xl font-bold mb-6 text-center">Get Started</h2>
             
-            <button className="w-full flex items-center justify-center gap-3 bg-white text-black py-3 rounded-lg font-semibold hover:bg-neutral-200 transition-colors mb-3">
+            <button onClick={onLogin} className="w-full flex items-center justify-center gap-3 bg-white text-black py-3 rounded-lg font-semibold hover:bg-neutral-200 transition-colors mb-3">
               <svg className="w-5 h-5" viewBox="0 0 24 24">
                 <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
                 <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
@@ -490,6 +464,9 @@ export const InfiniteMovingCards = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const scrollerRef = useRef<HTMLUListElement>(null);
 
+  // [추가] React 19 StrictMode에서 DOM이 2번 중복 복제되어 애니메이션이 멈추는 방지벽
+  const initializedRef = useRef(false);
+
   useEffect(() => {
     addAnimation();
   }, []);
@@ -497,7 +474,9 @@ export const InfiniteMovingCards = ({
   const [start, setStart] = useState(false);
 
   function addAnimation() {
-    if (containerRef.current && scrollerRef.current) {
+    if (containerRef.current && scrollerRef.current && !initializedRef.current) {
+      initializedRef.current = true;
+      
       const scrollerContent = Array.from(scrollerRef.current.children);
 
       scrollerContent.forEach((item) => {
