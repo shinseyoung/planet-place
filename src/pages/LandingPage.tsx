@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   motion,
   useScroll,
@@ -9,12 +9,12 @@ import {
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 
-// 유틸리티 함수
+// --- 유틸리티 함수 ---
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-// --- 임시 이미지 데이터 (나중에 준비된 이미지로 교체) ---
+// --- 임시 이미지 데이터 ---
 export const products = [
   { title: "Image 1", link: "#", thumbnail: "https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=800&auto=format&fit=crop" },
   { title: "Image 2", link: "#", thumbnail: "https://images.unsplash.com/photo-1543722530-d2c3201371e7?q=80&w=800&auto=format&fit=crop" },
@@ -36,9 +36,20 @@ export default function LandingPage({ onLogin }: { onLogin?: () => void }) {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
 
   return (
-   <div className="bg-[#050505] h-screen w-full relative overflow-y-auto overflow-x-hidden">
+    <div className="bg-[#050505] min-h-screen w-full relative">
       
-      {/* 1. 상단 고정 헤더 (로그인만 남김) */}
+      <style>{`
+        .animate-scroll {
+          animation: scroll var(--animation-duration, 40s) var(--animation-direction, forwards) linear infinite;
+        }
+        @keyframes scroll {
+          to {
+            transform: translate(calc(-50% - 0.5rem));
+          }
+        }
+      `}</style>
+
+      {/* 1. 상단 고정 헤더 */}
       <header className="fixed top-0 left-0 w-full z-50 flex items-center justify-between px-8 py-6 bg-gradient-to-b from-black/80 to-transparent backdrop-blur-sm text-white">
         <div className="flex items-center gap-2 cursor-pointer">
           <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center">
@@ -59,13 +70,13 @@ export default function LandingPage({ onLogin }: { onLogin?: () => void }) {
       {/* 2. 메인 패럴랙스 */}
       <HeroParallax products={products} />
 
-      {/* 3. 스크롤 동기화 반응형 타임라인 섹션 (스텝 3개로 축소) */}
+      {/* 3. 스크롤 동기화 반응형 타임라인 섹션 */}
       <FeatureTimeline />
 
-      {/* 4. 새롭게 추가된 Infinite Moving Cards (가로 스크롤 섹션) */}
+      {/* 4. Infinite Moving Cards + 리퀴드 웜홀 배경 */}
       <InfiniteMovingCardsDemo />
 
-      {/* 5. 새롭게 추가된 Footer (비즈니스 및 연락처 영역) */}
+      {/* 5. Footer */}
       <Footer />
 
       {/* 6. 로그인 팝업 모달 */}
@@ -78,9 +89,7 @@ export default function LandingPage({ onLogin }: { onLogin?: () => void }) {
             >
               ✕
             </button>
-            
             <h2 className="text-2xl font-bold mb-6 text-center">Get Started</h2>
-            
             <button onClick={onLogin} className="w-full flex items-center justify-center gap-3 bg-white text-black py-3 rounded-lg font-semibold hover:bg-neutral-200 transition-colors mb-3">
               <svg className="w-5 h-5" viewBox="0 0 24 24">
                 <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
@@ -90,20 +99,17 @@ export default function LandingPage({ onLogin }: { onLogin?: () => void }) {
               </svg>
               Continue with Google
             </button>
-
             <button className="w-full flex items-center justify-center gap-3 bg-white text-black py-3 rounded-lg font-semibold hover:bg-neutral-200 transition-colors mb-6">
               <svg className="w-5 h-5" viewBox="0 0 24 24">
                 <path fill="currentColor" d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.78 1.18-.19 2.31-.88 3.5-.83 1.5.06 2.65.67 3.32 1.63-2.99 1.76-2.48 5.86.33 7.03-.68 1.71-1.61 3.42-2.23 4.36zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
               </svg>
               Continue with Apple
             </button>
-            
             <div className="flex items-center gap-4 mb-6">
               <div className="h-[1px] flex-1 bg-white/10"></div>
               <span className="text-xs text-neutral-500 uppercase">or</span>
               <div className="h-[1px] flex-1 bg-white/10"></div>
             </div>
-
             <form className="flex flex-col gap-4" onSubmit={(e) => e.preventDefault()}>
               <div>
                 <label className="block text-sm text-neutral-400 mb-1">Email address</label>
@@ -117,8 +123,6 @@ export default function LandingPage({ onLogin }: { onLogin?: () => void }) {
                 Continue with Email
               </button>
             </form>
-
-            {/* 회원가입 유도 링크 */}
             <div className="mt-6 text-center">
               <a href="#" className="text-sm text-neutral-400 hover:text-white transition-colors">
                 No account? <span className="underline underline-offset-4">Sign up</span>
@@ -131,7 +135,7 @@ export default function LandingPage({ onLogin }: { onLogin?: () => void }) {
   );
 }
 
-// --- 2줄 버전으로 최적화된 HeroParallax ---
+// --- HeroParallax ---
 
 export const HeroParallax = ({
   products,
@@ -213,7 +217,7 @@ export const ProductCard = ({ product, translate }: { product: any; translate: M
   );
 };
 
-// --- 타임라인 섹션 (스크롤 동기화 애니메이션 완벽 적용) ---
+// --- 타임라인 섹션 ---
 
 export const FeatureTimeline = () => {
   const containerRef = useRef(null);
@@ -225,13 +229,11 @@ export const FeatureTimeline = () => {
   const lineHeight = useTransform(scrollYProgress, [0, 1], ["0%", "100%"]);
 
   return (
-    <div className="w-full bg-[#050505] pt-4 pb-8 md:pt-8 md:pb-16 relative font-sans z-10">
+    <div className="w-full bg-[#050505] pt-0 pb-16 md:pt-0 md:pb-24 relative font-sans z-10">
       <div className="max-w-7xl mx-auto px-4 md:px-8 lg:px-10">
         
-        {/* 섹션 타이틀 - useScroll 기반으로 스크롤을 올리고 내릴때 완벽히 동기화되어 움직입니다 */}
         <TimelineTitle />
 
-        {/* 하단 웜홀 섹션과의 잉여 간격을 줄이기 위해 pb-20 제거 */}
         <div ref={containerRef} className="relative">
           <div className="absolute left-8 md:left-1/2 top-0 bottom-0 w-[2px] bg-white/10 transform md:-translate-x-1/2"></div>
           
@@ -250,10 +252,8 @@ export const FeatureTimeline = () => {
   );
 };
 
-// 스크롤 동기화 타이틀 컴포넌트
 const TimelineTitle = () => {
   const ref = useRef(null);
-  // 요소가 뷰포트 하단에서 중앙으로 올 때 진행률 0 -> 1
   const { scrollYProgress } = useScroll({
     target: ref,
     offset: ["0 1", "0.5 0.5"],
@@ -266,17 +266,13 @@ const TimelineTitle = () => {
     <motion.div 
       ref={ref}
       style={{ y, opacity }}
-      className="text-center mt-10 mb-32 md:mt-16 md:mb-48"
+      className="text-center mt-20 mb-20 md:mt-24 md:mb-24"
     >
-      <h2 className="text-4xl md:text-6xl font-bold text-white mb-6">How It Works</h2>
-      <p className="text-neutral-400 text-lg md:text-xl max-w-2xl mx-auto font-light">
-        Step into a seamless journey from the vastness of space down to the precise coordinates of your imagination.
-      </p>
+      <h2 className="text-4xl md:text-6xl font-bold text-white mb-0">How It Works</h2>
     </motion.div>
   );
 };
 
-// 타임라인 데이터 (4개 -> 3개로 축소)
 const timelineFeatures = [
   {
     step: "01",
@@ -298,18 +294,15 @@ const timelineFeatures = [
   }
 ];
 
-// 스크롤 동기화 타임라인 아이템
 const TimelineItem = ({ feature, index }: { feature: any; index: number }) => {
   const isEven = index % 2 === 0;
   const ref = useRef(null);
 
-  // 스크롤이 아이템을 지나갈 때 진행률 감지 (내릴때 모이고 올릴때 흩어짐)
   const { scrollYProgress } = useScroll({
     target: ref,
     offset: ["0 1", "0.6 0.6"], 
   });
 
-  // 왼쪽 요소는 왼쪽(-100)에서, 오른쪽 요소는 오른쪽(100)에서 들어옴
   const textX = useTransform(scrollYProgress, [0, 1], [isEven ? -100 : 100, 0]);
   const imageX = useTransform(scrollYProgress, [0, 1], [isEven ? 100 : -100, 0]);
   const opacity = useTransform(scrollYProgress, [0, 1], [0, 1]);
@@ -318,7 +311,6 @@ const TimelineItem = ({ feature, index }: { feature: any; index: number }) => {
     <div ref={ref} className="relative flex flex-col md:flex-row items-center justify-between mb-24 md:mb-40 last:mb-0 w-full">
       <div className="absolute left-8 md:left-1/2 w-4 h-4 rounded-full bg-black border-2 border-[#275EFE] transform -translate-x-[7px] md:-translate-x-1/2 z-10"></div>
 
-      {/* 텍스트 영역 */}
       <motion.div
         style={{ x: textX, opacity }}
         className={`w-full md:w-5/12 pl-20 md:pl-0 flex flex-col justify-center ${
@@ -336,7 +328,6 @@ const TimelineItem = ({ feature, index }: { feature: any; index: number }) => {
         </p>
       </motion.div>
 
-      {/* 이미지 영역 */}
       <motion.div
         style={{ x: imageX, opacity }}
         className={`w-full md:w-5/12 pl-20 md:pl-0 mt-8 md:mt-0 ${
@@ -361,34 +352,33 @@ const TimelineItem = ({ feature, index }: { feature: any; index: number }) => {
 
 export function InfiniteMovingCardsDemo() {
   return (
-    // 1. 웜홀 크기 독립: h-[600px] md:h-[800px] 로 전체 높이를 고정합니다. (pt, pb 완전 제거)
-    // 이제부터 이 높이 값만 변경하면 웜홀 전체의 상하 스케일이 자유롭게 조절됩니다.
-    <div className="w-full h-[600px] md:h-[800px] relative antialiased bg-[#08080a] overflow-hidden">
+    <div className="w-full h-[700px] md:h-[950px] relative antialiased bg-[#08080a] overflow-hidden z-10 -mt-16 md:-mt-24 -mb-16 md:-mb-24">
       
-      {/* 상단 오목한 마스크: 웜홀 입구 */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[200vw] md:w-[180vw] h-[60px] md:h-[100px] bg-[#050505] rounded-b-[50%] z-10 border-b border-white/10 pointer-events-none"></div>
+      {/* 1. 프리미엄 WebGL 액체 배경 */}
+      <div className="absolute inset-0 pointer-events-none z-0">
+        <WebGLLiquid
+          colorDeep="#050505"      // 사이트 배경과 완벽 일치
+          colorMid="#0f172a"       // 깊은 다크 네이비
+          colorHighlight="#275EFE" // 사이트의 메인 포인트 블루
+          speed={0.6}
+          flowStrength={1.2}
+          grain={0.04}
+          contrast={1.1}
+          opacity={0.8}
+          reveal={true}
+        />
+      </div>
 
-      {/* 하단 오목한 마스크: 웜홀 출구 */}
-      <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[200vw] md:w-[180vw] h-[60px] md:h-[100px] bg-[#050505] rounded-t-[50%] z-10 border-t border-white/10 pointer-events-none"></div>
-
-      {/* ★ 핵심 수정 1: 오른쪽은 모니터 앞으로 다가오고, 왼쪽은 화면 안으로 들어가는 진짜 3D 웜홀 터널! 
-          단순히 기울어진 벽처럼 보이지 않도록 scaleX(2)로 폭을 거대하게 덮어씌웠습니다. */}
-      <div 
-        className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff08_1px,transparent_1px),linear-gradient(to_bottom,#ffffff08_1px,transparent_1px)] bg-[size:3rem_3rem] md:bg-[size:5rem_5rem] [mask-image:radial-gradient(ellipse_100%_100%_at_50%_50%,#000_50%,transparent_100%)] pointer-events-none animate-wormhole transform-gpu"
-        style={{ transform: "perspective(800px) rotateY(-15deg) scaleX(2) scaleY(1.3)" }}
-      ></div>
+      {/* 2. 상단/하단 오목한 검은색 마스크 (터널 효과) */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[180vw] md:w-[150vw] h-[100px] md:h-[180px] bg-[#050505] rounded-b-[50%] z-20 border-b border-white/10 pointer-events-none"></div>
+      <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[180vw] md:w-[150vw] h-[100px] md:h-[180px] bg-[#050505] rounded-t-[50%] z-20 border-t border-white/10 pointer-events-none"></div>
       
-      {/* 은은한 내부 빛 번짐 */}
-      <div className="absolute inset-0 shadow-[0_0_150px_rgba(39,94,254,0.12)_inset] pointer-events-none z-0"></div>
+      {/* 3. 은은한 내부 빛 번짐 효과 (블루 톤 적용) */}
+      <div className="absolute inset-0 shadow-[0_0_150px_rgba(39,94,254,0.15)_inset] pointer-events-none z-0"></div>
 
-      {/* 2. 컨텐츠 중앙 Absolute 배치: 웜홀 높이가 변해도 무조건 정중앙에 위치하도록 설계 */}
-      <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
-        
-        {/* ★ 핵심 수정 2: 강제로 위치를 옮기던 translate 값을 모두 제거하여 
-            위 빈공간(pt) == 텍스트와 카드 사이(gap) == 아래 빈공간(pb) 이 수학적으로 완벽한 정중앙 대칭을 이루게 합니다. */}
-        <div className="w-full flex flex-col items-center gap-8 md:gap-12 pointer-events-auto">
-          
-          {/* 텍스트 영역 (시각적 계산을 방해하던 scale-105 제거) */}
+      {/* 컨텐츠 중앙 Absolute 배치 */}
+      <div className="absolute inset-0 z-30 flex items-center justify-center pointer-events-none">
+        <div className="w-full flex flex-col items-center gap-[22px] md:gap-[30px] pointer-events-auto px-4">
           <motion.div 
             initial={{ opacity: 0, y: 50 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -397,10 +387,9 @@ export function InfiniteMovingCardsDemo() {
             className="text-center"
           >
             <h2 className="text-5xl md:text-7xl font-bold text-white tracking-tight">Miles Ahead.</h2>
-            <p className="text-neutral-400 mt-4 text-xl">Experience the next generation of pixel art mapping.</p>
+            <p className="text-neutral-400 mt-4 text-2xl">Experience the next generation of pixel art mapping.</p>
           </motion.div>
 
-          {/* 무한 스크롤 카드 영역 */}
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -416,7 +405,6 @@ export function InfiniteMovingCardsDemo() {
           </motion.div>
         </div>
       </div>
-
     </div>
   );
 }
@@ -464,9 +452,6 @@ export const InfiniteMovingCards = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const scrollerRef = useRef<HTMLUListElement>(null);
 
-  // [추가] React 19 StrictMode에서 DOM이 2번 중복 복제되어 애니메이션이 멈추는 방지벽
-  const initializedRef = useRef(false);
-
   useEffect(() => {
     addAnimation();
   }, []);
@@ -474,9 +459,7 @@ export const InfiniteMovingCards = ({
   const [start, setStart] = useState(false);
 
   function addAnimation() {
-    if (containerRef.current && scrollerRef.current && !initializedRef.current) {
-      initializedRef.current = true;
-      
+    if (containerRef.current && scrollerRef.current) {
       const scrollerContent = Array.from(scrollerRef.current.children);
 
       scrollerContent.forEach((item) => {
@@ -526,12 +509,11 @@ export const InfiniteMovingCards = ({
         ref={scrollerRef}
         className={cn(
           "flex min-w-full shrink-0 gap-6 py-6 w-max flex-nowrap",
-          start && "animate-scroll" // 마우스 오버 시 멈추는 hover 기능 완전 제거
+          start && "animate-scroll" 
         )}
       >
         {items.map((item) => (
           <li
-            // ★ 핵심 수정 3: 카드의 너비(w)와 내부 여백(p)을 대폭 키워 시원시원하고 꽉 찬 느낌을 주었습니다.
             className="w-[380px] md:w-[550px] max-w-full relative rounded-2xl border border-b-0 flex-shrink-0 border-white/10 px-8 py-8 md:px-10 md:py-10 bg-[#111] shadow-[0_8px_20px_rgb(0_0_0/0.5)]"
             key={item.name}
           >
@@ -540,7 +522,6 @@ export const InfiniteMovingCards = ({
                 aria-hidden="true"
                 className="user-select-none -z-1 pointer-events-none absolute -left-0.5 -top-0.5 h-[calc(100%_+_4px)] w-[calc(100%_+_4px)]"
               ></div>
-              {/* ★ 핵심 수정 4: 본문 내용, 이름, 직책의 글씨 크기를 모두 text-base ~ text-lg 급으로 키워 가독성과 웅장함을 살렸습니다. */}
               <span className="relative z-20 text-base md:text-lg leading-[1.6] text-neutral-300 font-light">
                 "{item.quote}"
               </span>
@@ -567,8 +548,7 @@ export const Footer = () => {
   return (
     <div className="w-full bg-[#050505] font-sans relative z-20">
       
-      {/* ★ 수정 3: Ready 위쪽 간격(pt-16)은 그대로 두고, 하단 여백을 pb-32에서 pb-48로 대폭 늘려 푸터를 아래로 내렸습니다. */}
-      <section className="pt-10 pb-32 md:pt-16 md:pb-48 px-4 md:px-8 border-b border-white/5">
+      <section className="pt-10 pb-16 md:pt-16 md:pb-20 px-4 md:px-8 border-b border-white/5">
         <div className="max-w-4xl mx-auto text-center flex flex-col items-center">
           <h2 className="text-4xl md:text-6xl font-bold text-white mb-6 tracking-tight">
             Ready to build your world?
@@ -583,21 +563,18 @@ export const Footer = () => {
         </div>
       </section>
 
-      {/* 2. 최종 Footer 영역 (로고 및 링크) */}
-      <footer className="w-full py-12 px-4 md:px-8">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
+      <footer className="w-full py-5 md:py-6 px-4 md:px-8">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
           
-          {/* 로고 */}
           <div className="flex items-center gap-2">
-            <div className="w-5 h-5 bg-white rounded-full flex items-center justify-center">
-              <div className="w-2 h-2 bg-black rounded-full"></div>
+            <div className="w-4 h-4 bg-white rounded-full flex items-center justify-center">
+              <div className="w-1.5 h-1.5 bg-black rounded-full"></div>
             </div>
-            <span className="text-xl font-bold text-white tracking-wider">Planet Studio</span>
+            <span className="text-lg font-bold text-white tracking-wider">Planet Studio</span>
           </div>
           
-          {/* 링크 및 카피라이트 */}
-          <div className="flex flex-col md:flex-row items-center gap-4 md:gap-8 text-neutral-500 text-sm font-light">
-            <div className="flex gap-6">
+          <div className="flex flex-col md:flex-row items-center gap-4 md:gap-6 text-neutral-500 text-xs md:text-sm font-light">
+            <div className="flex gap-5 md:gap-6">
               <a href="#" className="hover:text-white transition-colors">Terms</a>
               <a href="#" className="hover:text-white transition-colors">Privacy</a>
               <a href="#" className="hover:text-white transition-colors">Twitter</a>
@@ -610,4 +587,370 @@ export const Footer = () => {
       </footer>
     </div>
   );
+}
+
+// ============================================================================
+// WebGLLiquid 코어 로직 (한 파일에 합침)
+// ============================================================================
+
+const WebGLErrorBoundary = ({ children, fallback }: any) => {
+  const [hasError] = useState(false);
+  if (hasError) return fallback;
+  return children;
 };
+const WebGLFallback = ({ className }: any) => <div className={className} />;
+
+const VERTEX_SHADER = `
+attribute vec2 position;
+void main() {
+  gl_Position = vec4(position, 0.0, 1.0);
+}
+`;
+
+const FRAGMENT_SHADER = `
+precision highp float;
+
+uniform vec2 u_res;
+uniform float u_time;
+uniform vec3 u_colorDeep;
+uniform vec3 u_colorMid;
+uniform vec3 u_colorHighlight;
+uniform float u_speed;
+uniform float u_flowStrength;
+uniform float u_grain;
+uniform float u_contrast;
+uniform float u_opacity;
+uniform float u_reveal;
+
+float hash(vec2 p) {
+  return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+}
+
+float noise(vec2 p) {
+  vec2 i = floor(p);
+  vec2 f = fract(p);
+  float a = hash(i);
+  float b = hash(i + vec2(1.0, 0.0));
+  float c = hash(i + vec2(0.0, 1.0));
+  float d = hash(i + vec2(1.0, 1.0));
+  vec2 u = f * f * (3.0 - 2.0 * f);
+  return mix(a, b, u.x) + (c - a) * u.y * (1.0 - u.x) + (d - b) * u.x * u.y;
+}
+
+float fbm(vec2 p) {
+  float v = 0.0;
+  float a = 0.5;
+  mat2 rot = mat2(0.86, 0.51, -0.51, 0.86);
+  for (int i = 0; i < 6; i++) {
+    v += a * noise(p);
+    p = rot * p * 2.0;
+    a *= 0.5;
+  }
+  return v;
+}
+
+vec3 applyContrast(vec3 c, float contrast) {
+  return clamp((c - 0.5) * contrast + 0.5, 0.0, 1.0);
+}
+
+void main() {
+  vec2 uv = gl_FragCoord.xy / u_res;
+  float t = u_time * (0.14 * u_speed);
+  vec2 aspect = vec2(u_res.x / max(u_res.y, 1.0), 1.0);
+  vec2 p = (uv - 0.5) * aspect;
+
+  vec2 flowP = vec2(p.x * 1.1, p.y - t * 0.35);
+  float n1 = fbm(flowP * 2.8 + vec2(0.0, t * 0.2));
+  float n2 = fbm((flowP + n1 * 0.45) * 4.0 - vec2(0.0, t * 0.35));
+  float n3 = fbm((flowP + n2 * 0.4) * 6.5 + vec2(t * 0.15, 0.0));
+
+  float structure = n3 * 1.15 + (n2 - 0.5) * 0.5;
+  structure += (n1 - 0.5) * 0.3 * u_flowStrength;
+
+  float lowBand = smoothstep(0.18, 0.6, structure);
+  float highBand = smoothstep(0.62, 1.08, structure);
+  vec3 col = mix(u_colorDeep, u_colorMid, lowBand);
+  col = mix(col, u_colorHighlight, highBand);
+
+  float glow = smoothstep(0.52, 0.95, structure) * (0.35 + 0.5 * u_flowStrength);
+  col += glow * u_colorHighlight * 0.35;
+
+  float verticalMask = smoothstep(1.05, 0.05, uv.y);
+  verticalMask = pow(verticalMask, 1.1);
+
+  float vignette = smoothstep(1.28, 0.36, length(uv - 0.5));
+  col *= mix(0.9, 1.05, vignette);
+
+  col = applyContrast(col, u_contrast);
+
+  float dither = (hash(gl_FragCoord.xy + t * 10.0) - 0.5) * u_grain;
+  col += dither;
+
+  float alpha = verticalMask * smoothstep(0.08, 0.95, structure);
+  alpha *= smoothstep(0.0, 0.28, u_reveal - uv.x);
+  alpha *= u_opacity;
+
+  gl_FragColor = vec4(clamp(col, 0.0, 1.0), clamp(alpha, 0.0, 1.0));
+}
+`;
+
+const HEX_COLOR_REGEX = /^#?[0-9a-fA-F]{6}$/;
+const FALLBACK_DEEP = "#04050b";
+const FALLBACK_MID = "#134d93";
+const FALLBACK_HIGHLIGHT = "#8cecff";
+
+function sanitizeHexColor(value: string, fallback: string) {
+  const trimmed = value.trim();
+  if (!HEX_COLOR_REGEX.test(trimmed)) {
+    return fallback;
+  }
+  return trimmed.startsWith("#") ? trimmed : `#${trimmed}`;
+}
+
+function hexToRgb01(hex: string): [number, number, number] {
+  const normalized = sanitizeHexColor(hex, FALLBACK_DEEP).replace("#", "");
+  const r = parseInt(normalized.slice(0, 2), 16) / 255;
+  const g = parseInt(normalized.slice(2, 4), 16) / 255;
+  const b = parseInt(normalized.slice(4, 6), 16) / 255;
+  return [r, g, b];
+}
+
+export interface WebGLLiquidProps extends React.HTMLAttributes<HTMLDivElement> {
+  title?: string;
+  subtitle?: string;
+  description?: string;
+  colorDeep?: string;
+  colorMid?: string;
+  colorHighlight?: string;
+  speed?: number;
+  flowStrength?: number;
+  grain?: number;
+  contrast?: number;
+  opacity?: number;
+  reveal?: boolean;
+  delayMs?: number;
+  revealDuration?: number;
+  children?: React.ReactNode;
+}
+
+export function WebGLLiquid({
+  colorDeep = FALLBACK_DEEP,
+  colorMid = FALLBACK_MID,
+  colorHighlight = FALLBACK_HIGHLIGHT,
+  speed = 1,
+  flowStrength = 1,
+  grain = 0.05,
+  contrast = 1.1,
+  opacity = 0.95,
+  reveal = true,
+  delayMs = 0,
+  revealDuration = 1.2,
+  className,
+  style,
+  ...props
+}: WebGLLiquidProps) {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const hostRef = useRef<HTMLDivElement | null>(null);
+  const [hasWebGLError, setHasWebGLError] = useState(false);
+
+  const settings = useMemo(
+    () => ({
+      colorDeep,
+      colorMid,
+      colorHighlight,
+      speed,
+      flowStrength,
+      grain,
+      contrast,
+      opacity,
+      reveal,
+      delayMs,
+      revealDuration,
+    }),
+    [
+      colorDeep,
+      colorMid,
+      colorHighlight,
+      speed,
+      flowStrength,
+      grain,
+      contrast,
+      opacity,
+      reveal,
+      delayMs,
+      revealDuration,
+    ],
+  );
+
+  useEffect(() => {
+    if (hasWebGLError) return;
+
+    const canvas = canvasRef.current;
+    const host = hostRef.current;
+    if (!canvas || !host) return;
+
+    try {
+      const gl = canvas.getContext("webgl", { antialias: true, alpha: true });
+      if (!gl) {
+        setHasWebGLError(true);
+        return;
+      }
+
+      const compileShader = (type: number, source: string) => {
+        const shader = gl.createShader(type);
+        if (!shader) return null;
+        gl.shaderSource(shader, source);
+        gl.compileShader(shader);
+        if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+          gl.deleteShader(shader);
+          return null;
+        }
+        return shader;
+      };
+
+      const vertexShader = compileShader(gl.VERTEX_SHADER, VERTEX_SHADER);
+      const fragmentShader = compileShader(gl.FRAGMENT_SHADER, FRAGMENT_SHADER);
+      if (!vertexShader || !fragmentShader) {
+        setHasWebGLError(true);
+        return;
+      }
+
+      const program = gl.createProgram();
+      if (!program) {
+        gl.deleteShader(vertexShader);
+        gl.deleteShader(fragmentShader);
+        setHasWebGLError(true);
+        return;
+      }
+
+      gl.attachShader(program, vertexShader);
+      gl.attachShader(program, fragmentShader);
+      gl.linkProgram(program);
+      if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+        gl.deleteProgram(program);
+        gl.deleteShader(vertexShader);
+        gl.deleteShader(fragmentShader);
+        setHasWebGLError(true);
+        return;
+      }
+
+      gl.useProgram(program);
+
+      const positionLocation = gl.getAttribLocation(program, "position");
+      const quadBuffer = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, quadBuffer);
+      gl.bufferData(
+        gl.ARRAY_BUFFER,
+        new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]),
+        gl.STATIC_DRAW,
+      );
+      gl.enableVertexAttribArray(positionLocation);
+      gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
+
+      const uRes = gl.getUniformLocation(program, "u_res");
+      const uTime = gl.getUniformLocation(program, "u_time");
+      const uColorDeep = gl.getUniformLocation(program, "u_colorDeep");
+      const uColorMid = gl.getUniformLocation(program, "u_colorMid");
+      const uColorHighlight = gl.getUniformLocation(program, "u_colorHighlight");
+      const uSpeed = gl.getUniformLocation(program, "u_speed");
+      const uFlowStrength = gl.getUniformLocation(program, "u_flowStrength");
+      const uGrain = gl.getUniformLocation(program, "u_grain");
+      const uContrast = gl.getUniformLocation(program, "u_contrast");
+      const uOpacity = gl.getUniformLocation(program, "u_opacity");
+      const uReveal = gl.getUniformLocation(program, "u_reveal");
+
+      if (
+        !uRes || !uTime || !uColorDeep || !uColorMid || !uColorHighlight ||
+        !uSpeed || !uFlowStrength || !uGrain || !uContrast || !uOpacity || !uReveal
+      ) {
+        gl.deleteBuffer(quadBuffer);
+        gl.deleteProgram(program);
+        gl.deleteShader(vertexShader);
+        gl.deleteShader(fragmentShader);
+        setHasWebGLError(true);
+        return;
+      }
+
+      const resize = () => {
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        const { width, height } = host.getBoundingClientRect();
+        canvas.width = Math.max(1, Math.floor(width * dpr));
+        canvas.height = Math.max(1, Math.floor(height * dpr));
+        gl.viewport(0, 0, canvas.width, canvas.height);
+        gl.uniform2f(uRes, canvas.width, canvas.height);
+      };
+
+      resize();
+      const resizeObserver = new ResizeObserver(resize);
+      resizeObserver.observe(host);
+
+      let rafId = 0;
+      const start = performance.now();
+
+      const render = (now: number) => {
+        const elapsedSec = Math.max(0, (now - start - settings.delayMs) / 1000);
+        const revealProgress = settings.reveal
+          ? Math.min(1, elapsedSec / Math.max(settings.revealDuration, 0.05))
+          : 1;
+
+        const deep = hexToRgb01(settings.colorDeep);
+        const mid = hexToRgb01(settings.colorMid);
+        const highlight = hexToRgb01(settings.colorHighlight);
+
+        gl.clearColor(0, 0, 0, 0);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+
+        gl.uniform1f(uTime, elapsedSec);
+        gl.uniform3f(uColorDeep, deep[0], deep[1], deep[2]);
+        gl.uniform3f(uColorMid, mid[0], mid[1], mid[2]);
+        gl.uniform3f(uColorHighlight, highlight[0], highlight[1], highlight[2]);
+        gl.uniform1f(uSpeed, settings.speed);
+        gl.uniform1f(uFlowStrength, settings.flowStrength);
+        gl.uniform1f(uGrain, settings.grain);
+        gl.uniform1f(uContrast, settings.contrast);
+        gl.uniform1f(uOpacity, settings.opacity);
+        gl.uniform1f(uReveal, revealProgress);
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+        rafId = requestAnimationFrame(render);
+      };
+
+      rafId = requestAnimationFrame(render);
+
+      return () => {
+        cancelAnimationFrame(rafId);
+        resizeObserver.disconnect();
+        gl.deleteBuffer(quadBuffer);
+        gl.deleteProgram(program);
+        gl.deleteShader(vertexShader);
+        gl.deleteShader(fragmentShader);
+      };
+    } catch {
+      setHasWebGLError(true);
+      return;
+    }
+  }, [hasWebGLError, settings]);
+
+  const fallbackContent = (
+    <div
+      className={cn("relative w-full h-full bg-[#050505]", className)}
+      style={style}
+      {...props}
+    />
+  );
+
+  if (hasWebGLError) return fallbackContent;
+
+  return (
+    <WebGLErrorBoundary fallback={fallbackContent}>
+      <div ref={hostRef} className={cn("relative w-full h-full", className)} style={style} {...props}>
+        <canvas
+          ref={canvasRef}
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 h-full w-full"
+          style={{ width: "100%", height: "100%", display: "block" }}
+        />
+      </div>
+    </WebGLErrorBoundary>
+  );
+}
