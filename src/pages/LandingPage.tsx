@@ -8,6 +8,7 @@ import {
 } from "framer-motion";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { supabase } from "../lib/supabase"; // Supabase 클라이언트 연동
 
 // --- 유틸리티 함수 ---
 export function cn(...inputs: ClassValue[]) {
@@ -34,10 +35,141 @@ export const products = [
 
 export default function LandingPage({ onLogin }: { onLogin?: () => void }) {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const [isSignUp, setIsSignUp] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+
+  // 💡 [핵심 최적화] URL에 토큰이 있으면 아예 랜딩페이지를 안 그리고 인증 로딩 화면만 띄웁니다.
+  const [isProcessingOAuth, setIsProcessingOAuth] = useState(() => {
+    if (typeof window !== "undefined") {
+      return window.location.hash.includes("access_token");
+    }
+    return false;
+  });
+
+  // OAuth 리다이렉트 시 URL의 토큰을 강제로 낚아채서 로그인 시키는 안전망
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (hash && hash.includes("access_token")) {
+      // URL에서 강제로 토큰을 추출
+      const params = new URLSearchParams(hash.substring(1));
+      const access_token = params.get("access_token");
+      const refresh_token = params.get("refresh_token");
+
+      if (access_token && refresh_token) {
+        // 추출한 토큰을 기반으로 Supabase 세션 강제 주입
+        supabase.auth.setSession({
+          access_token,
+          refresh_token,
+        }).then(({ error }) => {
+          if (error) {
+            setErrorMessage("인증 처리 중 오류가 발생했습니다.");
+            setIsProcessingOAuth(false); // 실패 시 다시 랜딩페이지 노출
+          } else {
+            // 성공 시 지저분한 URL 해시를 깔끔하게 지우고 메인 화면으로 이동
+            window.history.replaceState(null, "", window.location.pathname);
+            onLogin?.();
+          }
+        });
+      } else {
+        setIsProcessingOAuth(false);
+      }
+    }
+  }, [onLogin]);
+
+  useEffect(() => {
+    const checkHash = () => {
+      if (window.location.hash === '#login') {
+        setIsLoginModalOpen(true);
+      } else {
+        setIsLoginModalOpen(false);
+      }
+    };
+
+    checkHash();
+    window.addEventListener('hashchange', checkHash);
+    return () => {
+      window.removeEventListener('hashchange', checkHash);
+    };
+  }, []);
+
+  const handleCloseModal = () => {
+    setIsLoginModalOpen(false);
+    window.history.pushState('', document.title, window.location.pathname + window.location.search);
+  };
+
+  const handleOpenLoginModal = () => {
+    window.location.hash = 'login';
+    setIsSignUp(false);
+    setErrorMessage("");
+  };
+
+  const handleOAuthLogin = async (provider: "google" | "apple") => {
+    try {
+      setLoading(true);
+      setErrorMessage("");
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: {
+          redirectTo: window.location.origin,
+        },
+      });
+      if (error) throw error;
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "로그인 중 오류가 발생했습니다.";
+      setErrorMessage(message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEmailAuth = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email || !password) return;
+
+    try {
+      setLoading(true);
+      setErrorMessage("");
+
+      if (isSignUp) {
+        const { error } = await supabase.auth.signUp({
+          email,
+          password,
+        });
+        if (error) throw error;
+        alert("회원가입 확인 이메일이 전송되었습니다. 메일함을 확인해주세요!");
+        handleCloseModal();
+      } else {
+        const { error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+        if (error) throw error;
+        onLogin?.(); 
+        handleCloseModal();
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "인증 오류가 발생했습니다.";
+      setErrorMessage(message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 💡 [UX 개선] 구글 인증 후 돌아왔을 때 랜딩페이지 UI를 그리지 않고 즉시 로딩 화면을 띄움 (번쩍거림 완벽 제거)
+  if (isProcessingOAuth) {
+    return (
+      <div className="min-h-screen bg-[#050505] flex flex-col items-center justify-center z-50">
+        <div className="w-10 h-10 border-4 border-white/10 border-t-blue-500 rounded-full animate-spin mb-4"></div>
+        <p className="text-neutral-300 font-bold tracking-widest animate-pulse">Authenticating...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-[#050505] min-h-screen w-full relative">
-      
       <style>{`
         .animate-scroll {
           animation: scroll var(--animation-duration, 40s) var(--animation-direction, forwards) linear infinite;
@@ -59,7 +191,7 @@ export default function LandingPage({ onLogin }: { onLogin?: () => void }) {
         </div>
         <div className="flex gap-4">
           <button 
-            onClick={() => setIsLoginModalOpen(true)}
+            onClick={handleOpenLoginModal}
             className="px-6 py-2.5 text-sm font-bold bg-white text-black rounded-full hover:bg-neutral-200 transition-colors"
           >
             Log In
@@ -79,54 +211,100 @@ export default function LandingPage({ onLogin }: { onLogin?: () => void }) {
       {/* 5. Footer */}
       <Footer />
 
-      {/* 6. 로그인 팝업 모달 */}
+      {/* 6. 로그인/회원가입 팝업 모달 */}
       {isLoginModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 text-white">
           <div className="relative w-full max-w-md bg-[#111] border border-white/10 rounded-2xl p-8 shadow-2xl">
             <button 
-              onClick={() => setIsLoginModalOpen(false)}
+              onClick={handleCloseModal}
               className="absolute top-4 right-4 text-neutral-400 hover:text-white"
             >
               ✕
             </button>
-            <h2 className="text-2xl font-bold mb-6 text-center">Get Started</h2>
-            <button onClick={onLogin} className="w-full flex items-center justify-center gap-3 bg-white text-black py-3 rounded-lg font-semibold hover:bg-neutral-200 transition-colors mb-3">
-              <svg className="w-5 h-5" viewBox="0 0 24 24">
-                <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
-                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
-              </svg>
-              Continue with Google
-            </button>
-            <button className="w-full flex items-center justify-center gap-3 bg-white text-black py-3 rounded-lg font-semibold hover:bg-neutral-200 transition-colors mb-6">
-              <svg className="w-5 h-5" viewBox="0 0 24 24">
-                <path fill="currentColor" d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.78 1.18-.19 2.31-.88 3.5-.83 1.5.06 2.65.67 3.32 1.63-2.99 1.76-2.48 5.86.33 7.03-.68 1.71-1.61 3.42-2.23 4.36zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
-              </svg>
-              Continue with Apple
-            </button>
-            <div className="flex items-center gap-4 mb-6">
-              <div className="h-[1px] flex-1 bg-white/10"></div>
-              <span className="text-xs text-neutral-500 uppercase">or</span>
-              <div className="h-[1px] flex-1 bg-white/10"></div>
-            </div>
-            <form className="flex flex-col gap-4" onSubmit={(e) => e.preventDefault()}>
+            
+            <h2 className="text-2xl font-bold mb-6 text-center">
+              {isSignUp ? "Create an Account" : "Log In"}
+            </h2>
+
+            {errorMessage && (
+              <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-sm rounded-lg text-center">
+                {errorMessage}
+              </div>
+            )}
+
+            {!isSignUp && (
+              <>
+                <button 
+                  onClick={() => handleOAuthLogin("google")} 
+                  disabled={loading}
+                  className="w-full flex items-center justify-center gap-3 bg-white text-black py-3 rounded-lg font-semibold hover:bg-neutral-200 transition-colors mb-3 disabled:opacity-50"
+                >
+                  <svg className="w-5 h-5" viewBox="0 0 24 24">
+                    <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
+                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
+                  </svg>
+                  Continue with Google
+                </button>
+
+                <div className="h-3"></div>
+
+                <div className="flex items-center gap-4 mb-6">
+                  <div className="h-[1px] flex-1 bg-white/10"></div>
+                  <span className="text-xs text-neutral-500 uppercase">or</span>
+                  <div className="h-[1px] flex-1 bg-white/10"></div>
+                </div>
+              </>
+            )}
+
+            <form className="flex flex-col gap-4" onSubmit={handleEmailAuth}>
               <div>
                 <label className="block text-sm text-neutral-400 mb-1">Email address</label>
-                <input type="email" placeholder="name@example.com" className="w-full bg-black border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-white/30" />
+                <input 
+                  type="email" 
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="name@example.com" 
+                  required
+                  className="w-full bg-black border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-white/30" 
+                />
               </div>
               <div>
                 <label className="block text-sm text-neutral-400 mb-1">Password</label>
-                <input type="password" placeholder="••••••••" className="w-full bg-black border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-white/30" />
+                <input 
+                  type="password" 
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••" 
+                  required
+                  minLength={6}
+                  className="w-full bg-black border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-white/30" 
+                />
               </div>
-              <button className="w-full bg-[#275EFE] text-white py-3 rounded-lg font-bold hover:bg-[#1f4bcf] transition-colors mt-2">
-                Continue with Email
+              <button 
+                type="submit" 
+                disabled={loading}
+                className="w-full bg-[#275EFE] text-white py-3 rounded-lg font-bold hover:bg-[#1f4bcf] transition-colors mt-2 disabled:opacity-50"
+              >
+                {loading ? "Processing..." : isSignUp ? "Sign Up with Email" : "Log In with Email"}
               </button>
             </form>
+
             <div className="mt-6 text-center">
-              <a href="#" className="text-sm text-neutral-400 hover:text-white transition-colors">
-                No account? <span className="underline underline-offset-4">Sign up</span>
-              </a>
+              <button 
+                type="button"
+                onClick={() => {
+                  setIsSignUp(!isSignUp);
+                  setErrorMessage("");
+                }}
+                className="text-sm text-neutral-400 hover:text-white transition-colors"
+              >
+                {isSignUp ? "Already have an account? " : "No account? "}
+                <span className="underline underline-offset-4">
+                  {isSignUp ? "Log in" : "Sign up"}
+                </span>
+              </button>
             </div>
           </div>
         </div>
@@ -347,8 +525,7 @@ const TimelineItem = ({ feature, index }: { feature: any; index: number }) => {
   );
 };
 
-
-// --- 새롭게 추가된 Infinite Moving Cards 섹션 (입체 곡선 배경) ---
+// --- Infinite Moving Cards 섹션 ---
 
 export function InfiniteMovingCardsDemo() {
   return (
@@ -359,7 +536,7 @@ export function InfiniteMovingCardsDemo() {
         <WebGLLiquid
           colorDeep="#050505"      // 사이트 배경과 완벽 일치
           colorMid="#0f172a"       // 깊은 다크 네이비
-          colorHighlight="#275EFE" // 사이트의 메인 포인트 블루
+          colorHighlight="#275EFE" // 사이트 메인 블루
           speed={0.6}
           flowStrength={1.2}
           grain={0.04}
@@ -437,7 +614,6 @@ const testimonials = [
   },
 ];
 
-// Infinite Moving Cards 코어 컴포넌트
 export const InfiniteMovingCards = ({
   items,
   direction = "left",
@@ -590,7 +766,7 @@ export const Footer = () => {
 }
 
 // ============================================================================
-// WebGLLiquid 코어 로직 (한 파일에 합침)
+// WebGLLiquid 코어 로직
 // ============================================================================
 
 const WebGLErrorBoundary = ({ children, fallback }: any) => {
@@ -598,7 +774,6 @@ const WebGLErrorBoundary = ({ children, fallback }: any) => {
   if (hasError) return fallback;
   return children;
 };
-const WebGLFallback = ({ className }: any) => <div className={className} />;
 
 const VERTEX_SHADER = `
 attribute vec2 position;
@@ -716,9 +891,6 @@ function hexToRgb01(hex: string): [number, number, number] {
 }
 
 export interface WebGLLiquidProps extends React.HTMLAttributes<HTMLDivElement> {
-  title?: string;
-  subtitle?: string;
-  description?: string;
   colorDeep?: string;
   colorMid?: string;
   colorHighlight?: string;
@@ -730,7 +902,6 @@ export interface WebGLLiquidProps extends React.HTMLAttributes<HTMLDivElement> {
   reveal?: boolean;
   delayMs?: number;
   revealDuration?: number;
-  children?: React.ReactNode;
 }
 
 export function WebGLLiquid({
