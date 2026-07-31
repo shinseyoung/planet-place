@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -6,7 +6,7 @@ import {
   Image as ImageIcon, Video, Share2, RotateCcw, 
   Settings, RefreshCw, Move, Sparkles, EyeOff, 
   Eye, Library, Download, LogOut, Moon, Save, 
-  AlertTriangle, Edit2, Lock, ShoppingCart, Wand2, Zap, Globe
+  AlertTriangle, Edit2, Lock, Gem, Camera
 } from 'lucide-react';
 import LandingPage from './pages/LandingPage';
 import { supabase } from './lib/supabase';
@@ -19,6 +19,22 @@ import { VoxelGlobe, CustomStars, ThumbnailCapturer } from './components/3d/Voxe
 
 // @ts-ignore
 import earthSeedCsvUrl from './assets/earth_seed.csv?url';
+// @ts-ignore
+import moonSeedCsvUrl from './assets/moon_seed.csv?url';
+// @ts-ignore
+import marsSeedCsvUrl from './assets/mars_seed.csv?url';
+// @ts-ignore
+import sunSeedCsvUrl from './assets/sun_seed.csv?url';
+// @ts-ignore
+import whiteSeedCsvUrl from './assets/white_seed.csv?url';
+
+const PLANET_BASE_SEEDS: Record<string, { url: string; fallbackPath: string; fillColor: string }> = {
+  Earth:    { url: earthSeedCsvUrl,        fallbackPath: '/assets/earth_seed.csv',         fillColor: '#000000' },
+  Moon:     { url: moonSeedCsvUrl,         fallbackPath: '/assets/moon_seed.csv',          fillColor: '#000000' },
+  Mars:     { url: marsSeedCsvUrl,         fallbackPath: '/assets/mars_seed.csv',          fillColor: '#000000' },
+  Sun:      { url: sunSeedCsvUrl,          fallbackPath: '/assets/sun_seed.csv',           fillColor: '#000000' },
+  White:    { url: whiteSeedCsvUrl,        fallbackPath: '/assets/white_seed.csv',         fillColor: '#000000' },
+};
 
 // ==========================================
 // 4. Main App Component
@@ -33,8 +49,15 @@ export default function App() {
     username: 'Explorer',
     avatar_url: null,
   });
+  
+  // Profile Edit States
   const [editUsername, setEditUsername] = useState('Explorer');
+  const [isEditingUsername, setIsEditingUsername] = useState(false);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
+  
+  // Avatar Upload State & Ref
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
 
   // Palette State
   const [selectedColor, setSelectedColor] = useState<string>(BASIC_PALETTE[0]);
@@ -60,7 +83,6 @@ export default function App() {
   const [isExportOpen, setIsExportOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isStoreModalOpen, setIsStoreModalOpen] = useState(false);
-  const [activeStoreTab, setActiveStoreTab] = useState<'features' | 'points'>('features');
   
   const [activePlanetId, setActivePlanetId] = useState(1);
   const currentPlanetId = session?.user ? `${session.user.id}_${activePlanetId}` : null;
@@ -97,6 +119,9 @@ export default function App() {
 
   // Data State
   const [basePixels, setBasePixels] = useState<PixelData[]>([]);
+  const [selectedBase, setSelectedBase] = useState<string>('Earth');
+  const baseCacheRef = useRef<Record<string, PixelData[]>>({});
+  const baseFillColor = PLANET_BASE_SEEDS[selectedBase]?.fillColor ?? '#0E336B';
   const [serverDataMap, setServerDataMap] = useState<Record<number, string>>({});
   const [unsavedPixels, setUnsavedPixels] = useState<Record<number, string>>({});
   
@@ -116,7 +141,6 @@ export default function App() {
       const initData = [
         { id: `${userId}_1`, user_id: userId, slot_number: 1, name: 'Origin Earth', is_unlocked: true }
       ];
-      // 409 방지: ignoreDuplicates true 추가
       await supabase.from('planets').upsert(initData, { onConflict: 'id', ignoreDuplicates: true });
       
       setPlanetNames({ 1: 'Origin Earth', 2: 'Locked Slot', 3: 'Locked Slot' });
@@ -198,10 +222,19 @@ export default function App() {
   }, [unsavedPixels]);
 
   useEffect(() => {
+    const config = PLANET_BASE_SEEDS[selectedBase] ?? PLANET_BASE_SEEDS.Earth;
+    let cancelled = false;
+
     const loadBaseMap = async () => {
+      const cached = baseCacheRef.current[selectedBase];
+      if (cached) {
+        setBasePixels(cached);
+        return;
+      }
+
       try {
-        let res = await fetch(earthSeedCsvUrl || '/src/assets/earth_seed.csv');
-        if (!res.ok) res = await fetch('/assets/earth_seed.csv');
+        let res = await fetch(config.url || config.fallbackPath);
+        if (!res.ok) res = await fetch(config.fallbackPath);
         if (!res.ok) return;
 
         const text = await res.text();
@@ -213,13 +246,19 @@ export default function App() {
             parsed.push({ x: parseInt(parts[0], 10), y: parseInt(parts[1], 10), color: parts[2].trim() });
           }
         }
-        setBasePixels(parsed);
+
+        if (!cancelled) {
+          baseCacheRef.current[selectedBase] = parsed;
+          setBasePixels(parsed);
+        }
       } catch (err) {
         console.error("Base Map Loading Error:", err);
       }
     };
     loadBaseMap();
-  }, []);
+
+    return () => { cancelled = true; };
+  }, [selectedBase]);
 
   useEffect(() => {
     if (!currentPlanetId) return;
@@ -334,7 +373,6 @@ export default function App() {
 
   const fetchProfile = async (user: any) => {
     const userId = user.id;
-    // 구글 등 OAuth 로그인 시 가져오는 메타데이터 정보 활용
     const meta = user.user_metadata || {};
     const googleName = meta.full_name || meta.name || 'Explorer';
     const googleAvatar = meta.avatar_url || null;
@@ -352,7 +390,6 @@ export default function App() {
         let currentUsername = data.username;
         let currentAvatar = data.avatar_url;
 
-        // DB에 유저가 존재하지만 이름이 없거나 'Explorer'로 되어있을 경우, 구글 이름으로 덮어쓰기 로직 보강
         if ((!currentUsername || currentUsername === 'Explorer') && googleName !== 'Explorer') {
             currentUsername = googleName;
             await supabase.from('profiles').update({ username: googleName }).eq('id', userId);
@@ -373,7 +410,6 @@ export default function App() {
           setUserPoints(data.points);
         }
         
-        // 텍스트, 배열 모든 경우를 대비한 강력한 파싱
         if (data.unlocked_pack_ids) {
           if (Array.isArray(data.unlocked_pack_ids)) {
             setUnlockedPacks(data.unlocked_pack_ids.map(Number));
@@ -401,7 +437,6 @@ export default function App() {
         }
 
       } else {
-         // 신규 가입 시 구글 정보 그대로 사용! (ignoreDuplicates 삭제하여 확실한 업데이트 보장)
          const { error: insertError } = await supabase.from('profiles').upsert(
            [{ id: userId, username: googleName, avatar_url: googleAvatar, points: 0, unlocked_pack_ids: [], unlocked_features: [] }],
            { onConflict: 'id' } 
@@ -421,6 +456,44 @@ export default function App() {
     }
   };
 
+  // Avatar Image Upload
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    try {
+      const file = e.target.files?.[0];
+      if (!file || !session?.user) return;
+      
+      setIsUploadingAvatar(true);
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${session.user.id}-${Date.now()}.${fileExt}`;
+      const filePath = `${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath);
+
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ avatar_url: publicUrl })
+        .eq('id', session.user.id);
+
+      if (updateError) throw updateError;
+
+      setProfile(prev => ({ ...prev, avatar_url: publicUrl }));
+    } catch (error: any) {
+      console.error("Avatar upload error:", error);
+      alert(`이미지 업로드 실패: ${error.message}`);
+    } finally {
+      setIsUploadingAvatar(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
   const handleSaveProfile = async () => {
     if (!session?.user || !editUsername.trim()) return;
     setIsSavingProfile(true);
@@ -428,7 +501,7 @@ export default function App() {
       const { error } = await supabase.from('profiles').update({ username: editUsername.trim() }).eq('id', session.user.id);
       if (error) throw error;
       setProfile(prev => ({ ...prev, username: editUsername.trim() }));
-      setIsProfileModalOpen(false);
+      setIsEditingUsername(false); // 저장 완료 시 텍스트 상태로 돌아감
     } catch (error: any) {
       alert(`저장 실패: ${error.message}`);
     } finally {
@@ -506,7 +579,6 @@ export default function App() {
     if (userPoints < price) {
       alert("포인트가 부족합니다. 스토어에서 포인트를 충전해주세요.");
       setIsStoreModalOpen(true);
-      setActiveStoreTab('points');
       setUnlockPrompt(null);
       return;
     }
@@ -548,7 +620,6 @@ export default function App() {
     if (userPoints < price) {
       alert("포인트가 부족합니다. 스토어에서 포인트를 충전해주세요.");
       setIsStoreModalOpen(true);
-      setActiveStoreTab('points');
       setFeaturePrompt(null);
       return;
     }
@@ -580,14 +651,12 @@ export default function App() {
     }
   };
 
-
   const confirmFeaturePurchase = async () => {
     if (!featurePrompt || !session?.user) return;
 
     if (userPoints < featurePrompt.price) {
       setFeaturePrompt(null);
       setIsStoreModalOpen(true);
-      setActiveStoreTab('points');
       return;
     }
 
@@ -607,7 +676,6 @@ export default function App() {
       setPlanetNames(prev => ({ ...prev, [nextSlotId]: 'Empty Slot' }));
       
       setFeaturePrompt(null);
-      setIsStoreModalOpen(false); 
       
       try {
         const { error: profileError } = await supabase
@@ -635,14 +703,9 @@ export default function App() {
          initPlanets(session.user.id);
       }
     } else {
-      // 일반 프리미엄 도구 해금
       handlePurchaseFeature(featurePrompt.id, featurePrompt.price);
     }
   };
-
-  const unlockedSlotsCount = Object.values(planetUnlocked).filter(Boolean).length;
-  const isSlotMaxed = unlockedSlotsCount >= 3;
-
 
   const dockItems = [
     {
@@ -653,17 +716,6 @@ export default function App() {
         setIsExportOpen(false);
         setIsSettingsOpen(false);
         setIsStoreModalOpen(false);
-      }
-    },
-    {
-      title: "Store",
-      icon: <ShoppingCart className="h-full w-full text-blue-400" />,
-      onClick: () => {
-        setIsStoreModalOpen(true);
-        setActiveStoreTab('features');
-        setIsMyPlanetsOpen(false);
-        setIsExportOpen(false);
-        setIsSettingsOpen(false);
       }
     },
     {
@@ -687,6 +739,16 @@ export default function App() {
       }
     },
     {
+      title: "Shop",
+      icon: <Gem className="h-full w-full text-purple-400" />,
+      onClick: () => {
+        setIsStoreModalOpen(true);
+        setIsMyPlanetsOpen(false);
+        setIsExportOpen(false);
+        setIsSettingsOpen(false);
+      }
+    },
+    {
       title: "Reset Planet",
       icon: <RotateCcw className="h-full w-full text-red-400" />,
       onClick: () => setIsResetModalOpen(true)
@@ -704,6 +766,7 @@ export default function App() {
       ),
       onClick: () => {
         setEditUsername(profile.username);
+        setIsEditingUsername(false); // 창을 열 때는 항상 일반 뷰 모드로 시작
         setIsProfileModalOpen(true);
       }
     },
@@ -714,7 +777,7 @@ export default function App() {
   return (
     <div className="w-full h-screen bg-black text-white overflow-hidden relative select-none">
       
-      {/* 1. 화면 깜빡임이 절대 없는 단일 로딩 커튼 */}
+      {/* 1. 단일 로딩 커튼 */}
       <AnimatePresence>
         {showCurtain && (
           <motion.div
@@ -730,14 +793,14 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      {/* 2. 비로그인 유저에게만 렌더링되는 랜딩페이지 */}
+      {/* 2. 비로그인 유저 랜딩페이지 */}
       {!loadingAuth && !session && (
         <div className="absolute inset-0 z-[5000] bg-[#050505]">
           <LandingPage onLogin={() => {}} /> 
         </div>
       )}
 
-      {/* 3. 로그인 완료 유저에게 렌더링되는 앱 본체 */}
+      {/* 3. 앱 본체 */}
       {!loadingAuth && session && (
         <>
           <Canvas camera={{ position: [0, 0, 50], fov: 45 }} gl={{ preserveDrawingBuffer: true }}>
@@ -753,7 +816,9 @@ export default function App() {
               <ambientLight intensity={2.5} />
             )}
 
-            {showStars && <CustomStars darkMode={darkMode} />}
+            {showStars && (
+              <CustomStars darkMode={darkMode} /> 
+            )}
             
             <VoxelGlobe 
               selectedColor={selectedColor} 
@@ -762,6 +827,7 @@ export default function App() {
               paintTrigger={paintTrigger}
               autoRotate={autoRotate}
               basePixels={basePixels}
+              baseDefaultColor={baseFillColor}
               serverDataMap={serverDataMap}
               unsavedPixels={unsavedPixels}
               setUnsavedPixels={setUnsavedPixels}
@@ -811,25 +877,6 @@ export default function App() {
                   <span className="text-lg font-bold tracking-wider text-white">Planet Studio</span>
                 </div>
 
-                {/* 우측 상단: 보라색 다이아몬드 포인트 UI */}
-                {session && (
-                  <div 
-                    onClick={() => {
-                      setIsStoreModalOpen(true);
-                      setActiveStoreTab('points'); // 포인트 탭으로 자동 연결
-                      setIsMyPlanetsOpen(false);
-                      setIsExportOpen(false);
-                      setIsSettingsOpen(false);
-                    }}
-                    className="absolute top-6 right-6 z-40 flex items-center gap-2.5 bg-black/40 backdrop-blur-2xl border border-white/10 px-5 py-2.5 rounded-full shadow-[0_0_40px_rgba(0,0,0,0.5)] pointer-events-auto transition-all hover:bg-white/10 cursor-pointer"
-                  >
-                    <span className="text-lg drop-shadow-[0_0_8px_rgba(168,85,247,0.8)]">💎</span>
-                    <span className="text-white font-bold tracking-wide text-sm">
-                      {userPoints.toLocaleString()} <span className="text-purple-400 ml-0.5">P</span>
-                    </span>
-                  </div>
-                )}
-
                 <AnimatePresence>
                   {Object.keys(unsavedPixels).length > 0 && (
                     <motion.div
@@ -850,6 +897,17 @@ export default function App() {
                   )}
                 </AnimatePresence>
 
+                {(isMyPlanetsOpen || isExportOpen || isSettingsOpen) && (
+                  <div
+                    className="fixed inset-0 z-30 pointer-events-auto"
+                    onClick={() => {
+                      setIsMyPlanetsOpen(false);
+                      setIsExportOpen(false);
+                      setIsSettingsOpen(false);
+                    }}
+                  />
+                )}
+
                 <div className="absolute bottom-32 left-1/2 -translate-x-1/2 z-50 flex justify-center pointer-events-auto">
                   <AnimatePresence mode="wait">
                     {isMyPlanetsOpen && (
@@ -867,7 +925,8 @@ export default function App() {
                               key={planet.id}
                               onClick={() => {
                                 if (!planetUnlocked[planet.id]) {
-                                  alert('상점(Store)에서 슬롯을 구매해야 사용할 수 있습니다.');
+                                  // 슬롯 클릭 시 즉시 500P 해금 팝업 호출 (상점 유도 대신)
+                                  setFeaturePrompt({ id: 'planet_slot', name: `Slot ${planet.id} 해금`, price: 500 });
                                   return;
                                 }
                                 handleSlotChange(planet.id);
@@ -875,7 +934,7 @@ export default function App() {
                               className={cn(
                                 "flex items-center w-full p-2 rounded-2xl cursor-pointer transition-all border",
                                 activePlanetId === planet.id ? "bg-blue-600/20 border-blue-500/50" : "hover:bg-white/10 border-transparent",
-                                !planetUnlocked[planet.id] && "opacity-50 grayscale hover:bg-transparent cursor-not-allowed"
+                                !planetUnlocked[planet.id] && "opacity-50 grayscale hover:bg-transparent cursor-pointer hover:border-white/20"
                               )}
                             >
                               <div className="w-10 h-10 rounded-[1rem] bg-gray-800 shrink-0 overflow-hidden flex items-center justify-center border border-white/10 relative">
@@ -935,7 +994,7 @@ export default function App() {
                                   </div>
                                 )}
                                 <span className="text-[10px] text-gray-500 truncate leading-none">
-                                  {!planetUnlocked[planet.id] ? 'Locked' : planet.isEmpty ? 'New Planet' : `Slot ${planet.id}`}
+                                  {!planetUnlocked[planet.id] ? 'Click to Unlock (500 P)' : planet.isEmpty ? 'New Planet' : `Slot ${planet.id}`}
                                 </span>
                               </div>
 
@@ -1037,6 +1096,8 @@ export default function App() {
                     if (envId === 'Sunlight') setSunLighting(prev => !prev);
                     if (envId === 'Stars') setShowStars(prev => !prev);
                   }}
+                  selectedBase={selectedBase}
+                  onSelectBase={setSelectedBase}
                 />
 
               </motion.div>
@@ -1045,7 +1106,7 @@ export default function App() {
 
           {/* --- Modals --- */}
           <AnimatePresence>
-            {/* 해금 확인 모달 (Micro-transaction) */}
+            {/* 해금 확인 모달 */}
             {unlockPrompt && (
               <motion.div 
                 initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -1078,7 +1139,7 @@ export default function App() {
               </motion.div>
             )}
 
-            {/* 프리미엄 기능 해금 확인 모달 */}
+            {/* 프리미엄 기능 해금 확인 모달 (슬롯 해금 포함) */}
             {featurePrompt && (
               <motion.div 
                 initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -1093,7 +1154,7 @@ export default function App() {
                   </div>
                   <h2 className="text-xl font-bold text-white mb-2">Unlock Feature</h2>
                   <p className="text-gray-400 text-sm mb-6 leading-relaxed">
-                    <span className="text-white font-bold">{featurePrompt.name}</span> 기능을<br/>
+                    <span className="text-white font-bold">{featurePrompt.name}</span>을(를)<br/>
                     <span className="text-emerald-400 font-bold">{featurePrompt.price} P</span>로 해금하시겠습니까?
                   </p>
                   <div className="flex gap-3 w-full">
@@ -1119,144 +1180,76 @@ export default function App() {
               >
                 <motion.div 
                   initial={{ scale: 0.95, opacity: 0, y: 10 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.95, opacity: 0, y: 10 }}
-                  className="bg-[#0a0a12]/90 backdrop-blur-2xl border border-white/10 p-6 rounded-[2rem] max-w-xl w-full shadow-[0_0_50px_rgba(0,0,0,0.8)] flex flex-col"
+                  className="bg-[#0a0a12]/90 backdrop-blur-2xl border border-white/10 p-6 rounded-[2rem] max-w-2xl w-full shadow-[0_0_50px_rgba(0,0,0,0.8)] flex flex-col"
                 >
-                  <div className="flex justify-between items-center mb-6">
+                  <div className="flex justify-between items-center mb-1">
                     <h2 className="text-2xl font-bold text-white flex items-center gap-3">
-                      <ShoppingCart className="w-6 h-6 text-blue-400" />
-                      Studio Shop
+                      <div className="w-10 h-10 bg-purple-500/10 rounded-full flex items-center justify-center border border-purple-500/20">
+                        <Gem className="w-5 h-5 text-purple-400" />
+                      </div>
+                      Point Shop
                     </h2>
                     <button onClick={() => setIsStoreModalOpen(false)} className="text-gray-400 hover:text-white transition-colors bg-white/5 hover:bg-white/10 p-2 rounded-full">
                       ✕
                     </button>
                   </div>
+                  <p className="text-gray-500 text-sm mb-6 pl-[3.25rem]">
+                    Grab more points to unlock palettes, planets, and features.
+                  </p>
 
-                  {/* Tabs */}
-                  <div className="flex gap-2 mb-4 p-1.5 bg-black/40 border border-white/10 rounded-2xl w-fit mx-auto shrink-0">
-                    <button
-                      onClick={() => setActiveStoreTab('features')}
-                      className={cn(
-                        "px-6 py-2 rounded-xl text-sm font-bold transition-all duration-300 flex items-center gap-2",
-                        activeStoreTab === 'features' ? "bg-blue-600 text-white shadow-[0_0_15px_rgba(37,99,235,0.5)]" : "text-gray-400 hover:text-white hover:bg-white/5"
-                      )}
-                    >
-                      <Sparkles className="w-4 h-4" />
-                      프리미엄 기능
-                    </button>
-                    <button
-                      onClick={() => setActiveStoreTab('points')}
-                      className={cn(
-                        "px-6 py-2 rounded-xl text-sm font-bold transition-all duration-300 flex items-center gap-2",
-                        activeStoreTab === 'points' ? "bg-purple-600 text-white shadow-[0_0_15px_rgba(147,51,234,0.5)]" : "text-gray-400 hover:text-white hover:bg-white/5"
-                      )}
-                    >
-                      <Zap className="w-4 h-4" />
-                      포인트 충전
-                    </button>
-                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pb-1 items-stretch">
+                    {/* Starter Pack */}
+                    <div className="relative bg-gradient-to-b from-blue-500/10 to-transparent border border-blue-500/20 rounded-[1.75rem] p-6 pt-8 text-center hover:bg-blue-500/[0.07] hover:border-blue-400/30 transition-all flex flex-col items-center">
+                      <div className="w-14 h-14 bg-blue-500/10 rounded-2xl flex items-center justify-center mb-4 border border-blue-400/20">
+                        <Gem className="w-6 h-6 text-blue-300" />
+                      </div>
+                      <h4 className="text-2xl font-black text-white leading-none">500</h4>
+                      <span className="text-[11px] text-blue-300/60 font-medium mb-5 mt-1 tracking-wide">POINTS</span>
+                      <button className="w-full py-2.5 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 text-blue-100 font-bold transition-colors mt-auto">
+                        $4.99
+                      </button>
+                    </div>
 
-                  {/* Content View (고정 높이 및 내부 애니메이션 제거로 완벽한 안정성) */}
-                  <div className="h-[360px] w-full overflow-hidden relative">
-                    <div className="absolute inset-0 overflow-y-auto pr-2 pb-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-                      {activeStoreTab === 'features' ? (
-                        <div className="flex flex-col gap-3 w-full">
-                          {/* Item 1: Planet Slot */}
-                          <div className="bg-white/5 border border-white/10 rounded-2xl p-4 hover:bg-white/10 transition-colors flex items-center gap-4">
-                            <div className="w-12 h-12 bg-emerald-500/20 rounded-xl flex items-center justify-center shrink-0 text-emerald-400">
-                              <Library className="w-6 h-6" />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <h3 className="text-base font-bold text-white mb-0.5 truncate">행성 슬롯 추가 (+1)</h3>
-                              <p className="text-xs text-gray-400 leading-snug line-clamp-2">나만의 우주를 더 넓히세요. 새로운 픽셀 아트를 저장할 수 있는 빈 행성 슬롯을 해금합니다.</p>
-                            </div>
-                            <button 
-                               onClick={() => setFeaturePrompt({ id: 'planet_slot', name: '행성 슬롯 추가 (+1)', price: 500 })}
-                               disabled={isSlotMaxed}
-                               className={cn(
-                                 "py-2.5 px-5 rounded-xl font-bold transition-colors text-sm whitespace-nowrap shrink-0",
-                                 isSlotMaxed ? "bg-gray-800 text-gray-500 cursor-not-allowed" : "bg-emerald-600 hover:bg-emerald-500 text-white shadow-[0_0_15px_rgba(16,185,129,0.4)]"
-                               )}>
-                              {isSlotMaxed ? 'Max Reached' : '500 P'}
-                            </button>
-                          </div>
+                    {/* Popular Pack — highlighted */}
+                    <div className="relative bg-gradient-to-b from-purple-500/10 to-transparent border border-purple-400/20 rounded-[1.75rem] p-6 pt-8 text-center hover:bg-purple-500/[0.07] hover:border-purple-400/30 transition-all flex flex-col items-center">
+                      <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-gradient-to-r from-purple-500 to-blue-500 text-white text-[10px] font-bold tracking-wide px-3 py-1 rounded-full shadow-[0_0_15px_rgba(168,85,247,0.6)] whitespace-nowrap">
+                        MOST POPULAR
+                      </div>
+                      <div className="w-14 h-14 bg-purple-500/15 rounded-2xl flex items-center justify-center mb-4 border border-purple-400/30">
+                        <Gem className="w-7 h-7 text-purple-300 drop-shadow-[0_0_8px_rgba(168,85,247,0.8)]" />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-2xl font-black text-white leading-none">1,200</h4>
+                        <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-full px-1.5 py-0.5">+20%</span>
+                      </div>
+                      <span className="text-[11px] text-purple-300/70 font-medium mb-5 mt-1 tracking-wide">POINTS</span>
+                      <button className="w-full py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 hover:brightness-110 text-white font-bold transition-all shadow-[0_0_20px_rgba(168,85,247,0.4)] mt-auto">
+                        $9.99
+                      </button>
+                    </div>
 
-                          {/* Item 2: Smart Tools */}
-                          <div className="bg-white/5 border border-white/10 rounded-2xl p-4 hover:bg-white/10 transition-colors flex items-center gap-4">
-                            <div className="w-12 h-12 bg-pink-500/20 rounded-xl flex items-center justify-center shrink-0 text-pink-400">
-                              <Wand2 className="w-6 h-6" />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <h3 className="text-base font-bold text-white mb-0.5 truncate">스마트 페인트 팩</h3>
-                              <p className="text-xs text-gray-400 leading-snug line-clamp-2">스포이트, 페인트통(채우기), 대칭 모드 등 반복 작업을 획기적으로 줄여주는 도구 세트.</p>
-                            </div>
-                            <button 
-                              onClick={() => setFeaturePrompt({ id: 'paint_pack', name: '스마트 페인트 팩', price: 300 })}
-                              className="py-2.5 px-5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold transition-colors text-sm whitespace-nowrap shrink-0"
-                            >
-                              {unlockedFeatures.includes('paint_pack') ? 'Owned' : '300 P'}
-                            </button>
-                          </div>
-
-                          {/* Item 3: Hologram Tracing */}
-                          <div className="bg-white/5 border border-white/10 rounded-2xl p-4 hover:bg-white/10 transition-colors flex items-center gap-4">
-                            <div className="w-12 h-12 bg-blue-500/20 rounded-xl flex items-center justify-center shrink-0 text-blue-400">
-                              <ImageIcon className="w-6 h-6" />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <h3 className="text-base font-bold text-white mb-0.5 truncate">홀로그램 트레이싱</h3>
-                              <p className="text-xs text-gray-400 leading-snug line-clamp-2">원하는 이미지를 캔버스 위에 반투명하게 띄워놓고 그대로 따라 그릴 수 있는 마법의 툴입니다.</p>
-                            </div>
-                            <button 
-                              onClick={() => {
-                                if (!unlockedFeatures.includes('hologram')) {
-                                  setFeaturePrompt({ id: 'hologram', name: '홀로그램 트레이싱', price: 1000 });
-                                }
-                              }}
-                              className={cn(
-                                "py-2.5 px-5 rounded-xl font-bold transition-colors text-sm whitespace-nowrap shrink-0",
-                                unlockedFeatures.includes('hologram') ? "bg-gray-800 text-gray-500 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-500 text-white shadow-[0_0_15px_rgba(37,99,235,0.4)]"
-                              )}
-                            >
-                              {unlockedFeatures.includes('hologram') ? 'Owned' : '1,000 P'}
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                          <div className="bg-gradient-to-br from-blue-900/40 to-blue-900/10 border border-blue-500/30 rounded-2xl p-6 text-center relative overflow-hidden group hover:border-blue-400 transition-colors">
-                            <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/20 rounded-full blur-2xl -mr-10 -mt-10"></div>
-                            <div className="w-16 h-16 mx-auto bg-blue-500/20 rounded-2xl border border-blue-400/30 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                              <Sparkles className="w-8 h-8 text-blue-400" />
-                            </div>
-                            <h4 className="text-xl font-black text-white mb-1">500 P</h4>
-                            <p className="text-xs text-blue-200/60 mb-6">Starter Pack</p>
-                            <button className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold shadow-[0_0_15px_rgba(37,99,235,0.4)] transition-colors">$4.99</button>
-                          </div>
-
-                          <div className="bg-gradient-to-br from-purple-900/50 to-purple-900/20 border border-purple-500/50 rounded-2xl p-6 text-center relative overflow-hidden group hover:border-purple-400 transition-colors transform scale-105 shadow-2xl z-10">
-                            <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/30 rounded-full blur-2xl -mr-10 -mt-10"></div>
-                            <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-gradient-to-r from-yellow-400 to-orange-500 text-black text-[9px] font-black px-3 py-1 rounded-full uppercase tracking-widest shadow-lg">Most Popular</div>
-                            <div className="w-16 h-16 mx-auto bg-purple-500/30 rounded-2xl border border-purple-400/50 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                              <Zap className="w-8 h-8 text-purple-300" />
-                            </div>
-                            <h4 className="text-xl font-black text-white mb-1">1,200 P</h4>
-                            <p className="text-xs text-purple-200/60 mb-6">+200 Bonus Points</p>
-                            <button className="w-full py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold shadow-[0_0_20px_rgba(147,51,234,0.5)] transition-colors">$9.99</button>
-                          </div>
-
-                          <div className="bg-gradient-to-br from-amber-900/40 to-amber-900/10 border border-amber-500/30 rounded-2xl p-6 text-center relative overflow-hidden group hover:border-amber-400 transition-colors">
-                            <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/20 rounded-full blur-2xl -mr-10 -mt-10"></div>
-                            <div className="w-16 h-16 mx-auto bg-amber-500/20 rounded-2xl border border-amber-400/30 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                              <Globe className="w-8 h-8 text-amber-400" />
-                            </div>
-                            <h4 className="text-xl font-black text-white mb-1">3,000 P</h4>
-                            <p className="text-xs text-amber-200/60 mb-6">Creator Tier</p>
-                            <button className="w-full py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold shadow-[0_0_15px_rgba(217,119,6,0.4)] transition-colors">$19.99</button>
-                          </div>
-                        </div>
-                      )}
+                    {/* Best Value Pack */}
+                    <div className="relative bg-gradient-to-b from-amber-500/10 to-transparent border border-amber-500/20 rounded-[1.75rem] p-6 pt-8 text-center hover:bg-amber-500/[0.07] hover:border-amber-400/30 transition-all flex flex-col items-center">
+                      <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-[10px] font-bold tracking-wide px-3 py-1 rounded-full shadow-[0_0_15px_rgba(245,158,11,0.5)] whitespace-nowrap">
+                        BEST VALUE
+                      </div>
+                      <div className="w-14 h-14 bg-amber-500/10 rounded-2xl flex items-center justify-center mb-4 border border-amber-400/20">
+                        <Gem className="w-6 h-6 text-amber-300" />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-2xl font-black text-white leading-none">3,000</h4>
+                        <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-full px-1.5 py-0.5">+50%</span>
+                      </div>
+                      <span className="text-[11px] text-amber-300/60 font-medium mb-5 mt-1 tracking-wide">POINTS</span>
+                      <button className="w-full py-2.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 text-amber-100 font-bold transition-colors mt-auto">
+                        $19.99
+                      </button>
                     </div>
                   </div>
+
+                  <p className="text-center text-[11px] text-gray-600 mt-5">
+                    Payments are processed securely. Points are added to your account instantly.
+                  </p>
                 </motion.div>
               </motion.div>
             )}
@@ -1334,46 +1327,86 @@ export default function App() {
               className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-md px-4 pointer-events-auto"
             >
               <motion.div 
-                initial={{ scale: 0.95, y: 20 }}
-                animate={{ scale: 1, y: 0 }}
-                exit={{ scale: 0.95, y: 20 }}
-                className="bg-slate-900 border border-white/10 rounded-3xl w-full max-w-sm p-8 shadow-2xl flex flex-col items-center relative overflow-hidden"
+                initial={{ scale: 0.95, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.95, opacity: 0 }}
+                className="bg-[#0a0a12]/90 backdrop-blur-2xl border border-white/10 rounded-[2rem] w-full max-w-sm p-8 shadow-[0_0_50px_rgba(0,0,0,0.8)] flex flex-col items-center"
               >
-                <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-br from-blue-600/20 to-purple-600/20"></div>
-                
-                <div className="relative z-10 w-24 h-24 mb-4">
-                  <img src={profile?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${profile?.username}`} alt="avatar" className="w-full h-full rounded-full border-4 border-slate-900 bg-slate-800 shadow-xl" />
-                  <button className="absolute bottom-0 right-0 w-8 h-8 bg-blue-600 rounded-full border-2 border-slate-900 flex items-center justify-center text-white hover:bg-blue-500 transition-colors shadow-lg">
-                    <Edit2 className="w-4 h-4" />
-                  </button>
+                <div className="relative w-24 h-24 mb-5">
+                  <img src={profile?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${profile?.username}`} alt="avatar" className="w-full h-full rounded-full border-4 border-white/10 bg-slate-800 shadow-xl object-cover" />
+                  
+                  {/* 편집 모드일 때만 카메라 버튼 표시 */}
+                  {isEditingUsername && (
+                    <button 
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isUploadingAvatar}
+                      className="absolute bottom-0 right-0 w-8 h-8 bg-blue-600 rounded-full border-2 border-[#0a0a12] flex items-center justify-center text-white hover:bg-blue-500 transition-colors shadow-lg disabled:opacity-50"
+                      title="Change Avatar"
+                    >
+                      {isUploadingAvatar ? (
+                        <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      ) : (
+                        <Camera className="w-4 h-4" />
+                      )}
+                    </button>
+                  )}
+                  <input 
+                    type="file" 
+                    ref={fileInputRef} 
+                    onChange={handleAvatarUpload} 
+                    accept="image/*" 
+                    className="hidden" 
+                  />
                 </div>
 
-                <h2 className="text-2xl font-black text-white mb-1 z-10">{profile?.username}</h2>
-                <p className="text-sm text-blue-400 font-medium mb-8 z-10 flex items-center gap-1.5"><Sparkles className="w-3.5 h-3.5" /> {userPoints} Points</p>
-
-                <div className="w-full space-y-4 z-10">
-                  <div>
-                    <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5 block">Username</label>
+                {!isEditingUsername ? (
+                  <h2 className="text-2xl font-black text-white text-center">{profile?.username}</h2>
+                ) : (
+                  <div className="w-full">
                     <input 
                       type="text" 
                       value={editUsername}
                       onChange={(e) => setEditUsername(e.target.value)} 
-                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-blue-500 transition-colors" 
+                      className="w-full bg-black/50 border border-blue-500/50 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-blue-500 transition-colors text-center font-bold text-lg shadow-inner"
+                      autoFocus
+                      placeholder="Username"
                     />
                   </div>
+                )}
+                
+                {/* 포인트 표시 (항상 노출 - 위아래 균일한 간격) */}
+                <div className="mt-4 mb-6 flex items-center gap-1.5 bg-white/5 border border-white/10 rounded-full px-4 py-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-blue-400" />
+                  <span className="text-sm text-blue-400 font-bold">{userPoints.toLocaleString()} Points</span>
                 </div>
 
-                <div className="flex gap-3 w-full mt-8 z-10">
-                  <button onClick={() => setIsProfileModalOpen(false)} className="flex-1 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white font-medium transition-colors border border-white/5">
-                    Cancel
-                  </button>
-                  <button 
-                    onClick={handleSaveProfile}
-                    disabled={isSavingProfile}
-                    className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold transition-colors shadow-[0_0_15px_rgba(37,99,235,0.4)] flex items-center justify-center disabled:opacity-50"
-                  >
-                    {isSavingProfile ? 'Saving...' : 'Save'}
-                  </button>
+                <div className="flex gap-3 w-full">
+                  {!isEditingUsername ? (
+                    <>
+                      <button onClick={() => setIsProfileModalOpen(false)} className="flex-1 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white font-medium transition-colors border border-white/5">
+                        Close
+                      </button>
+                      <button onClick={() => setIsEditingUsername(true)} className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold transition-colors shadow-[0_0_15px_rgba(37,99,235,0.4)]">
+                        Edit
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button 
+                        onClick={() => { setIsEditingUsername(false); setEditUsername(profile.username); }} 
+                        className="flex-1 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white font-medium transition-colors border border-white/5"
+                      >
+                        Cancel
+                      </button>
+                      <button 
+                        onClick={handleSaveProfile}
+                        disabled={isSavingProfile || !editUsername.trim()}
+                        className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold transition-colors shadow-[0_0_15px_rgba(37,99,235,0.4)] flex items-center justify-center disabled:opacity-50"
+                      >
+                        {isSavingProfile ? 'Saving...' : 'Save'}
+                      </button>
+                    </>
+                  )}
                 </div>
               </motion.div>
             </motion.div>

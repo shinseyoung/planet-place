@@ -89,9 +89,13 @@ interface VoxelGlobeProps {
   unsavedPixels: Record<number, string>;
   setUnsavedPixels: React.Dispatch<React.SetStateAction<Record<number, string>>>;
   resetTrigger?: number;
+  // 🪐 basePixels가 일부(대륙 등)만 채워진 데이터일 때 나머지 칸을 채울 기본색.
+  // Moon/Mars/Saturn/Sun/Inverted Earth처럼 180,000픽셀이 전부 채워진 데이터를 쓸 땐
+  // 이 값이 실질적으로 보이지 않으므로 App.tsx에서 null-safe한 값을 내려줍니다.
+  baseDefaultColor?: string;
 }
 
-export function VoxelGlobe({ selectedColor, targetIds, setTargetIds, paintTrigger, autoRotate, basePixels, serverDataMap, unsavedPixels, setUnsavedPixels }: VoxelGlobeProps) {
+export function VoxelGlobe({ selectedColor, targetIds, setTargetIds, paintTrigger, autoRotate, basePixels, serverDataMap, unsavedPixels, setUnsavedPixels, baseDefaultColor = '#0E336B' }: VoxelGlobeProps) {
   const groupRef = useRef<THREE.Group>(null);
   const meshRef = useRef<THREE.InstancedMesh>(null);
   const hoverMeshRef = useRef<THREE.Mesh>(null);
@@ -134,7 +138,7 @@ export function VoxelGlobe({ selectedColor, targetIds, setTargetIds, paintTrigge
       const key = `${pos.x.toFixed(3)},${pos.y.toFixed(3)},${pos.z.toFixed(3)}`;
 
       if (!map.has(key)) {
-        map.set(key, { pos, color: '#0E336B', id: id }); 
+        map.set(key, { pos, color: baseDefaultColor, id: id }); 
       }
       idMap.set(id, map.get(key)!.id); 
     }
@@ -148,7 +152,7 @@ export function VoxelGlobe({ selectedColor, targetIds, setTargetIds, paintTrigge
     });
 
     return { renderMap: map, idToCanonical: idMap };
-  }, [basePixels, get3DPos]);
+  }, [basePixels, get3DPos, baseDefaultColor]);
 
   useLayoutEffect(() => {
     if (!meshRef.current || renderMap.size === 0) return;
@@ -372,6 +376,7 @@ export function VoxelGlobe({ selectedColor, targetIds, setTargetIds, paintTrigge
   };
 
   return (
+    <>
     <group ref={groupRef}>
       <instancedMesh ref={meshRef} args={[null as any, null as any, 200000]}>
         <boxGeometry args={[VOXEL_SIZE, VOXEL_SIZE, VOXEL_SIZE]} />
@@ -397,5 +402,6 @@ export function VoxelGlobe({ selectedColor, targetIds, setTargetIds, paintTrigge
         <meshBasicMaterial transparent opacity={0} depthWrite={false} side={THREE.DoubleSide} />
       </mesh>
     </group>
+    </>
   );
 }

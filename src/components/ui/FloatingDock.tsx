@@ -79,10 +79,10 @@ function IconContainer({ mouseX, title, icon, onClick }: { mouseX: MotionValue; 
   let widthTransformIcon = useTransform(distance, [-150, 0, 150], [20, 40, 20]);
   let heightTransformIcon = useTransform(distance, [-150, 0, 150], [20, 40, 20]);
 
-  let width = useSpring(widthTransform, { mass: 0.1, stiffness: 150, damping: 12 });
-  let height = useSpring(heightTransform, { mass: 0.1, stiffness: 150, damping: 12 });
-  let widthIcon = useSpring(widthTransformIcon, { mass: 0.1, stiffness: 150, damping: 12 });
-  let heightIcon = useSpring(heightTransformIcon, { mass: 0.1, stiffness: 150, damping: 12 });
+  let width = useSpring(widthTransform, { mass: 0.1, stiffness: 400, damping: 18 });
+  let height = useSpring(heightTransform, { mass: 0.1, stiffness: 400, damping: 18 });
+  let widthIcon = useSpring(widthTransformIcon, { mass: 0.1, stiffness: 400, damping: 18 });
+  let heightIcon = useSpring(heightTransformIcon, { mass: 0.1, stiffness: 400, damping: 18 });
 
   const [hovered, setHovered] = useState(false);
 

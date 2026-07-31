@@ -17,21 +17,23 @@ interface PaletteSidebarProps {
   // ⭐️ 부모(App.tsx)로부터 환경 설정 상태와 토글 함수를 전달받습니다!
   envStates: Record<string, boolean>;
   onToggleEnv: (envId: string) => void;
+
+  // 🪐 부모(App.tsx)로부터 Planet Base 선택 상태와 변경 함수를 전달받습니다!
+  selectedBase: string;
+  onSelectBase: (baseId: string) => void;
 }
 
 const PLANET_BASES = [
   { id: 'Earth', name: 'Earth', price: 0, defaultUnlocked: true },
   { id: 'Moon', name: 'Moon', price: 500, defaultUnlocked: false },
   { id: 'Mars', name: 'Mars', price: 500, defaultUnlocked: false },
-  { id: 'Inverted', name: 'Inverted Earth', price: 500, defaultUnlocked: false },
-  { id: 'Void', name: 'Blank Void', price: 500, defaultUnlocked: false },
+  { id: 'Sun', name: 'Sun', price: 500, defaultUnlocked: false },
+  { id: 'White', name: 'White', price: 500, defaultUnlocked: false },
 ];
 
 const ENVIRONMENTS = [
   { id: 'Sunlight', name: 'Sunlight', price: 0, defaultUnlocked: true },
   { id: 'Stars', name: 'Stars', price: 0, defaultUnlocked: true },
-  { id: 'Nebula', name: 'Nebula', price: 500, defaultUnlocked: false },
-  { id: 'Aurora', name: 'Aurora', price: 500, defaultUnlocked: false },
 ];
 
 export function PaletteSidebar({
@@ -45,16 +47,17 @@ export function PaletteSidebar({
   targetIds,
   handlePaint,
   envStates,     // ⭐️ Props 추가
-  onToggleEnv    // ⭐️ Props 추가
+  onToggleEnv,   // ⭐️ Props 추가
+  selectedBase,  // 🪐 Props 추가
+  onSelectBase   // 🪐 Props 추가
 }: PaletteSidebarProps) {
   const [paletteSearch, setPaletteSearch] = useState('');
   const [paletteTab, setPaletteTab] = useState<'all' | 'theme' | 'country'>('all');
   
   const [isPacksExpanded, setIsPacksExpanded] = useState(false);
   const [activeModal, setActiveModal] = useState<'base' | 'env' | null>(null);
-  const [selectedBase, setSelectedBase] = useState('Earth');
   
-  // 💡 기존에 있던 내부 useState(envStates)는 완전히 삭제하여 부모에게 제어권을 넘겼습니다!
+  // 💡 기존에 있던 내부 useState(envStates / selectedBase)는 완전히 삭제하여 부모에게 제어권을 넘겼습니다!
 
   const packsWithIndex = useMemo(() => {
     return THEME_PACKS.map((pack, idx) => ({ ...pack, originalIndex: idx }));
@@ -84,7 +87,7 @@ export function PaletteSidebar({
   const handleBaseSelect = (base: typeof PLANET_BASES[0]) => {
     const isUnlocked = base.defaultUnlocked || unlockedFeatures.includes(`base_${base.id.toLowerCase()}`);
     if (isUnlocked) {
-      setSelectedBase(base.id);
+      onSelectBase(base.id);
     } else {
       setFeaturePrompt({
         id: `base_${base.id.toLowerCase()}`,

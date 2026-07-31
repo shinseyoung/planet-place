@@ -3,7 +3,7 @@ import fs from 'fs';
 
 function convert() {
   // 1. 아까 만든 JSON 파일 읽어오기
-  const jsonData = JSON.parse(fs.readFileSync('earth_seed.json', 'utf-8'));
+  const jsonData = JSON.parse(fs.readFileSync('one.json', 'utf-8'));
 
   // 2. CSV 헤더(컬럼명) 작성 (Supabase DB 컬럼명과 일치해야 함)
   let csvContent = 'x,y,color\n';
@@ -14,8 +14,8 @@ function convert() {
   });
 
   // 4. CSV 파일로 저장
-  fs.writeFileSync('earth_seed.csv', csvContent);
-  console.log(`✅ 1초 컷! 총 ${jsonData.length}개의 데이터가 earth_seed.csv로 변환되었습니다!`);
+  fs.writeFileSync('white_seed.csv', csvContent);
+  console.log(`✅ 1초 컷! 총 ${jsonData.length}개의 데이터가 csv로 변환되었습니다!`);
 }
 
 convert();
