@@ -724,12 +724,12 @@ export const Footer = () => {
   return (
     <div className="w-full bg-[#050505] font-sans relative z-20">
       
-      <section className="pt-10 pb-16 md:pt-16 md:pb-20 px-4 md:px-8 border-b border-white/5">
+      <section className="pt-6 pb-10 md:pt-4 md:pb-12 px-4 md:px-8 border-b border-white/5">
         <div className="max-w-4xl mx-auto text-center flex flex-col items-center">
           <h2 className="text-4xl md:text-6xl font-bold text-white mb-6 tracking-tight">
             Ready to build your world?
           </h2>
-          <p className="text-neutral-400 text-lg md:text-xl mb-10 max-w-2xl font-light leading-relaxed">
+          <p className="text-neutral-400 text-lg md:text-xl mb-16 max-w-2xl font-light leading-relaxed">
             Interested in advertising, business inquiries, or creating custom private planet instances for your community? 
             Let's create something amazing together.
           </p>
